@@ -6,7 +6,7 @@ import 'package:firebase_storage/firebase_storage.dart';
 import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
-import 'package:tmbpk/tmbpk.dart'; // Importar o pacote personalizado
+import 'package:tmbpk/tmbpk.dart';
 
 class CadastroScreen extends StatefulWidget {
   @override
@@ -14,6 +14,8 @@ class CadastroScreen extends StatefulWidget {
 }
 
 class _CadastroScreenState extends State<CadastroScreen> {
+  final _formKey = GlobalKey<FormState>();
+
   final TextEditingController nomeController = TextEditingController();
   final TextEditingController cepController = TextEditingController();
   final TextEditingController enderecoController = TextEditingController();
@@ -30,20 +32,22 @@ class _CadastroScreenState extends State<CadastroScreen> {
   final ImagePicker _picker = ImagePicker();
 
   void calcularETmb() {
-    double peso = double.parse(pesoController.text);
-    double altura = double.parse(alturaController.text);
-    int idade = int.parse(idadeController.text);
+    if (_formKey.currentState?.validate() ?? false) {
+      double peso = double.parse(pesoController.text);
+      double altura = double.parse(alturaController.text);
+      int idade = int.parse(idadeController.text);
 
-    setState(() {
-      tmb = calcularTMB(
-        peso: peso,
-        altura: altura,
-        idade: idade,
-        sexo: sexoSelecionado ?? '',
-      );
-    });
+      setState(() {
+        tmb = calcularTMB(
+          peso: peso,
+          altura: altura,
+          idade: idade,
+          sexo: sexoSelecionado ?? '',
+        );
+      });
 
-    saveToFirestore();
+      saveToFirestore();
+    }
   }
 
   Future<void> pickImage(ImageSource source) async {
@@ -70,7 +74,6 @@ class _CadastroScreenState extends State<CadastroScreen> {
         setState(() {
           enderecoController.text = data['logradouro'];
           bairroController.text = data['bairro'];
-          // Outros campos como complemento e número não são fornecidos pela API, devem ser preenchidos manualmente.
         });
       } else {
         print('Erro ao buscar endereço');
@@ -122,78 +125,88 @@ class _CadastroScreenState extends State<CadastroScreen> {
       body: Padding(
         padding: const EdgeInsets.all(16.0),
         child: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              buildTextField('Nome', nomeController),
-              DropdownButton<String>(
-                value: sexoSelecionado,
-                hint: Text('Selecione o Sexo'),
-                onChanged: (String? newValue) {
-                  setState(() {
-                    sexoSelecionado = newValue;
-                  });
-                },
-                items: <String>['Homem', 'Mulher']
-                    .map<DropdownMenuItem<String>>((String value) {
-                  return DropdownMenuItem<String>(
-                    value: value,
-                    child: Text(value),
-                  );
-                }).toList(),
-              ),
-              buildTextField('CEP', cepController, onChanged: (value) {
-                if (value.length == 8) {
-                  buscarEndereco();
-                }
-              }),
-              buildTextField('Endereço', enderecoController),
-              buildTextField('Número', numeroController),
-              buildTextField('Complemento', complementoController),
-              buildTextField('Bairro', bairroController),
-              buildTextField('Peso (kg)', pesoController),
-              buildTextField('Altura (cm)', alturaController),
-              buildTextField('Idade', idadeController),
-              SizedBox(height: 10),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: [
-                  ElevatedButton(
-                    onPressed: () => pickImage(ImageSource.gallery),
-                    child: Text('Selecionar da Galeria'),
-                  ),
-                  ElevatedButton(
-                    onPressed: () => pickImage(ImageSource.camera),
-                    child: Text('Tirar Foto'),
-                  ),
-                ],
-              ),
-              if (_image != null)
-                Image.file(_image!, height: 200),
-              SizedBox(height: 10),
-              ElevatedButton(
-                onPressed: calcularETmb,
-                child: Text('Calcular TMB e Salvar'),
-              ),
-              SizedBox(height: 20),
-              if (tmb != null) Text('TMB: ${tmb!.toStringAsFixed(2)}'),
-            ],
+          child: Form(
+            key: _formKey,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                buildTextFormField('Nome', nomeController),
+                DropdownButtonFormField<String>(
+                  value: sexoSelecionado,
+                  hint: Text('Selecione o Sexo'),
+                  onChanged: (String? newValue) {
+                    setState(() {
+                      sexoSelecionado = newValue;
+                    });
+                  },
+                  validator: (value) => value == null ? 'Selecione o sexo' : null,
+                  items: <String>['Homem', 'Mulher']
+                      .map<DropdownMenuItem<String>>((String value) {
+                    return DropdownMenuItem<String>(
+                      value: value,
+                      child: Text(value),
+                    );
+                  }).toList(),
+                ),
+                buildTextFormField('CEP', cepController, onChanged: (value) {
+                  if (value.length == 8) {
+                    buscarEndereco();
+                  }
+                }),
+                buildTextFormField('Endereço', enderecoController),
+                buildTextFormField('Número', numeroController),
+                buildTextFormField('Complemento', complementoController),
+                buildTextFormField('Bairro', bairroController),
+                buildTextFormField('Peso (kg)', pesoController),
+                buildTextFormField('Altura (cm)', alturaController),
+                buildTextFormField('Idade', idadeController),
+                SizedBox(height: 10),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children: [
+                    ElevatedButton(
+                      onPressed: () => pickImage(ImageSource.gallery),
+                      child: Text('Selecionar da Galeria'),
+                    ),
+                    ElevatedButton(
+                      onPressed: () => pickImage(ImageSource.camera),
+                      child: Text('Tirar Foto'),
+                    ),
+                  ],
+                ),
+                if (_image != null)
+                  Image.file(_image!, height: 200),
+                SizedBox(height: 10),
+                ElevatedButton(
+                  onPressed: calcularETmb,
+                  child: Text('Calcular TMB e Salvar'),
+                ),
+                SizedBox(height: 20),
+                if (tmb != null) Text('TMB: ${tmb!.toStringAsFixed(2)}'),
+              ],
+            ),
           ),
         ),
       ),
     );
   }
 
-  Widget buildTextField(String labelText, TextEditingController controller, {Function(String)? onChanged}) {
+  Widget buildTextFormField(String labelText, TextEditingController controller, {Function(String)? onChanged}) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8.0),
-      child: TextField(
+      child: TextFormField(
         controller: controller,
         decoration: InputDecoration(
           labelText: labelText,
           border: OutlineInputBorder(),
         ),
         keyboardType: TextInputType.text,
+        validator: (value) {
+          if (value == null || value.isEmpty) {
+            return 'Preencha o campo $labelText';
+          }
+          return null;
+        },
         onChanged: onChanged,
       ),
     );
